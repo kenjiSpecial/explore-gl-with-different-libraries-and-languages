@@ -1,25 +1,86 @@
-const gameState = {
-    move: null,
-};
+const readline = require('readline');
 
-function moveGamePart(gameStateValue, gamePart, colNum, rowNum) {
+if (require.main === module) {
+    const colNum = 10;
+    const rowNum = 5;
+    const gameState = {
+        move: null,
+        score: 0,
+        gameOver: false,
+    };
+
+    const gameStage = createMultiArr(colNum, rowNum);
+    addKeyboardEvent(gameState);
+    loop(gameState, gameStage, colNum, rowNum, [], 0);
+}
+
+function moveGamePart(gameStage, gameStateValue, gamePart, colNum, rowNum) {
     if (gameStateValue.move === 'right') {
+        let canMoveRight = true;
         const gamePartRight = gamePart.col + gamePart.width - 1 + gamePart.origin.col;
 
-        gamePart.col =
-            gamePartRight + 1 >= colNum
-                ? colNum - gamePart.width - gamePart.origin.col
-                : gamePart.col + 1;
+        for (let rowIndex = 0; rowIndex < gamePart.value.length; rowIndex++) {
+            const gameRowArr = gamePart.value[rowIndex];
+            const colSize = gameRowArr.length;
+            let rightCol = colSize - 1;
+
+            for (let colIndex = colSize - 2; colIndex >= 0; colIndex--) {
+                if (gameRowArr[colIndex] === 1 && gameRowArr[colIndex + 1] === 0) {
+                    rightCol = colIndex;
+                    break;
+                }
+            }
+
+            const row = rowIndex + gamePart.row + gamePart.origin.row;
+            const col = rightCol + 1 + gamePart.col + gamePart.origin.col;
+
+            if (gameStage[row] && gameStage[row][col]) {
+                canMoveRight = false;
+                break;
+            }
+        }
+
+        if (canMoveRight) {
+            gamePart.col =
+                gamePartRight + 1 >= colNum
+                    ? colNum - gamePart.width - gamePart.origin.col
+                    : gamePart.col + 1;
+        }
     } else if (gameStateValue.move === 'left') {
-        gamePart.col =
-            gamePart.col + gamePart.origin.col - 1 < 0 ? -gamePart.origin.col : gamePart.col - 1;
+        let canMoveLeft = true;
+
+        for (let rowIndex = 0; rowIndex < gamePart.value.length; rowIndex++) {
+            const gameRowArr = gamePart.value[rowIndex];
+            const colSize = gameRowArr.length;
+            let leftCol = 0;
+
+            for (let colIndex = 1; colIndex < colSize; colIndex++) {
+                if (gameRowArr[colIndex - 1] === 0 && gameRowArr[colIndex] === 1) {
+                    leftCol = colIndex;
+                    break;
+                }
+            }
+
+            const row = rowIndex + gamePart.row + gamePart.origin.row;
+            const col = leftCol - 1 + gamePart.col + gamePart.origin.col;
+
+            if (gameStage[row] && gameStage[row][col]) {
+                canMoveLeft = false;
+                break;
+            }
+        }
+
+        if (canMoveLeft) {
+            gamePart.col =
+                gamePart.col + gamePart.origin.col - 1 < 0
+                    ? -gamePart.origin.col
+                    : gamePart.col - 1;
+        }
     }
 }
 
 function moveFall(gamePart, gameStage, colNum, rowNum) {
     const gamePartBot = gamePart.row + gamePart.origin.row + gamePart.height;
-
-    // gamePartBot
 
     const isGameFall = gamePart.value[gamePart.value.length - 1].reduce(
         (accumulator, gameItem, colIndex) => {
@@ -33,7 +94,7 @@ function moveFall(gamePart, gameStage, colNum, rowNum) {
         },
         false
     );
-    
+
     if (isGameFall) {
         return isGameFall;
     }
@@ -47,7 +108,7 @@ function moveFall(gamePart, gameStage, colNum, rowNum) {
     return false;
 }
 
-function resetState() {
+function resetState(gameState) {
     gameState.move = null;
 }
 
@@ -133,7 +194,7 @@ function convertPartToObject(gamePart) {
     return arr;
 }
 
-function createBox(rowNum) {
+function createBox(colNum) {
     return {
         width: 2,
         height: 2,
@@ -141,7 +202,7 @@ function createBox(rowNum) {
             col: -1,
             row: -1,
         },
-        col: Math.floor(rowNum / 2),
+        col: Math.ceil(colNum / 2),
         row: -1,
         rot: 0,
         isDone: false,
@@ -152,9 +213,12 @@ function createBox(rowNum) {
     };
 }
 
-function showStage(value) {
+function showStage(value, score) {
     console.clear();
+    console.log('=============\n');
     process.stdout.write(converToString(value));
+    console.log('=============\n');
+    console.log('SCORE:' + score + '\n\n');
 }
 
 function converToString(value) {
@@ -167,24 +231,70 @@ function converToString(value) {
                 }, '') +
                 '\n'
             );
-        }, '') + '\n\n'
+        }, '') + '\n'
     );
 }
 
-function isLoop() {
-    return true;
+function converToNum(value) {
+    return (
+        value.reduce((accumulator, currentValue) => {
+            return (
+                accumulator +
+                currentValue.reduce((accumulator2, currentValue2) => {
+                    return accumulator2 + ' ' + currentValue2;
+                }, '') +
+                '\n'
+            );
+        }, '') + '\n'
+    );
 }
 
-function moveRight() {
+function erase(gameStage, score, colNum, rowNum) {
+    const a = createMultiArr(colNum, rowNum);
+    const eraseRowArr = [];
+    let curScore = score;
+
+    for (let rowIndex = 0; rowIndex < rowNum; rowIndex++) {
+        let isErase = true;
+        for (let colIndex = 0; colIndex < colNum; colIndex++) {
+            if (gameStage[rowIndex][colIndex] !== 2) {
+                isErase = false;
+                break;
+            }
+        }
+
+        if (isErase) {
+            curScore++;
+            eraseRowArr.push(rowIndex);
+        }
+    }
+    let targetRow = rowNum - 1;
+    for (let rowIndex = rowNum - 1; rowIndex >= 0; rowIndex--) {
+        if (!eraseRowArr.includes(rowIndex)) {
+            for (let colIndex = 0; colIndex < colNum; colIndex++) {
+                a[targetRow][colIndex] = gameStage[rowIndex][colIndex];
+            }
+
+            targetRow--;
+        }
+    }
+
+    return { gameStage: a, score: curScore };
+}
+
+function isLoop(isGameOver) {
+    return !isGameOver;
+}
+
+function moveRight(gameState) {
     gameState.move = 'right';
 }
 
-function moveLeft() {
+function moveLeft(gameState) {
     gameState.move = 'left';
 }
 
-function addKeyboardEvent() {
-    const readline = require('readline');
+function addKeyboardEvent(gameState) {
     readline.emitKeypressEvents(process.stdin);
     process.stdin.setRawMode(true);
 
@@ -192,50 +302,54 @@ function addKeyboardEvent() {
         if (key.ctrl && key.name === 'c') {
             process.exit();
         } else {
-            if (key.name === 'right') moveRight();
-            if (key.name === 'left') moveLeft();
+            if (key.name === 'right') moveRight(gameState);
+            if (key.name === 'left') moveLeft(gameState);
         }
     });
 }
 
-if (require.main === module) {
-    const colNum = 10;
-    const rowNum = 5;
-
-    let gameStage = createMultiArr(colNum, rowNum);
-    addKeyboardEvent();
-    loop(gameStage, colNum, rowNum, [], 0);
-}
-
-function loop(gameStage, colNum, rowNum, gameParts, cnt) {
+function loop(gameState, gameStage, colNum, rowNum, gameParts, cnt) {
     const loopIntervaTime = 100;
     let gamePartArr = [];
 
+    const obj = erase(gameStage, gameState.score, colNum, rowNum);
+    gameStage = obj.gameStage;
+    gameState.score = obj.score;
+
     gameParts.forEach((gamePart) => {
-        moveGamePart(gameState, gamePart, colNum, rowNum);
+        moveGamePart(gameStage, gameState, gamePart, colNum, rowNum);
         gamePartArr = gamePartArr.concat(convertPartToObject(gamePart));
     });
-    let updatedGamedStage = addGamePart(gameStage, gamePartArr);
-    showStage(updatedGamedStage);
 
-    resetState();
+    const updatedGamedStage = addGamePart(gameStage, gamePartArr);
+    showStage(updatedGamedStage, gameState.score);
+
+    resetState(gameState);
+
     if (cnt % 6 === 0) {
         gameParts = gameParts.filter((gamePart) => {
             gamePart.isDone = moveFall(gamePart, gameStage, colNum, rowNum);
+            const top = gamePart.row + gamePart.origin.row;
             if (gamePart.isDone) {
-                gameStage = addGamePart(gameStage, convertPartToObject(gamePart));
+                if (top >= 0) {
+                    gameStage = addGamePart(gameStage, convertPartToObject(gamePart));
+                } else {
+                    gameState.gameOver = true;
+                }
             }
+
             return !gamePart.isDone;
         });
     }
 
-    if (isLoop())
+    if (isLoop(gameState.gameOver))
         setTimeout(() => {
             if (gameParts.length === 0) {
                 gameParts.push(createTetrisPart(colNum, rowNum));
             }
-            loop(gameStage, colNum, rowNum, gameParts, cnt + 1);
+            loop(gameState, gameStage, colNum, rowNum, gameParts, cnt + 1);
         }, loopIntervaTime);
+    else console.log('=== GAME OVER ===');
 }
 
 module.exports = {
@@ -249,4 +363,5 @@ module.exports = {
     moveFall,
     loop,
     addKeyboardEvent,
+    erase,
 };
