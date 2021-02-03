@@ -1,13 +1,26 @@
+# Languages
+
+- JavaScript ( #JS )
+
+# Categories
+
+## Game 
 - Tetris
+
+## Graphics
 - Realtime 3D Graphics(ray tracer)
+
+## Server
 - A Simple HTTP Server 
 
-Languages
+## Productivity 
 
-JavaScript
+- ToDo App
+- Note App
 
 
-Referrences
+
+# Referrences
 
 JavaScript(Node.JS)
 https://github.com/sindresorhus/awesome-nodejs
